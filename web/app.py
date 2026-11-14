@@ -5,12 +5,14 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import kpis
 
 app = FastAPI(title="SafeCode AI")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (id INTEGER PRIMARY KEY, repo TEXT, pr INTEGER, sha TEXT, ts REAL,
   duration_s REAL, tokens_in INTEGER, tokens_out INTEGER, cost_kzt REAL, ai INTEGER,
@@ -115,7 +117,12 @@ def dashboard():
 
 @app.get("/")
 def index():
-    return RedirectResponse("/dashboard")
+    return FileResponse(Path(__file__).parent / "landing.html")
+
+
+@app.get("/api/config")
+def config():
+    return {"demo_pr_url": os.environ.get("DEMO_PR_URL", "")}
 
 
 @app.get("/healthz")

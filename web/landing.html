@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeCode AI: security review inside the pull request</title>
+<meta name="description" content="SafeCode AI scans only the lines a pull request changes, filters false alarms with a reason, and suggests a fix you can commit in one click.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="/static/app.css">
+<style>
+  .hero { padding: 72px 0 8px; max-width: 760px; }
+  .hero p.lead { color: var(--mut); font-size: 18px; margin: 20px 0 28px; max-width: 62ch; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 16px 16px 56px; position: relative; }
+  .steps li::before { content: counter(s, decimal-leading-zero); position: absolute; left: 16px; top: 16px; font: 600 14px var(--mono); color: var(--teal); }
+  .pr { background: #0d1626; border: 1px solid var(--line); border-radius: var(--r); font: 14px/1.6 var(--mono); padding: 16px; overflow-x: auto; }
+  .pr .h { color: var(--txt); font-weight: 600; }
+  .pr .d { color: var(--mut); }
+  .pr .add { color: var(--green); } .pr .del { color: var(--red); }
+  .pr pre { margin: 12px 0 0; white-space: pre; }
+  .price { display: flex; flex-direction: column; gap: 8px; }
+  .price .amt { font-size: 26px; font-weight: 650; }
+  .price ul { margin: 4px 0 0; padding-left: 18px; color: var(--mut); }
+  .real-row { display: grid; grid-template-columns: 104px 1fr; gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .real-row:last-child { border-bottom: 0; }
+  .note { font-size: 14px; color: var(--mut); margin-top: 12px; }
+  @media (max-width: 480px) { .real-row { grid-template-columns: 1fr; gap: 6px; } .hero { padding-top: 40px; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/"><i aria-hidden="true"></i>SafeCode AI</a>
+  <nav aria-label="Main">
+    <a href="/" aria-current="page">Overview</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="https://github.com/champaldi/safecode-ai" rel="noopener">GitHub</a>
+  </nav>
+</div></header>
+
+<main id="main" class="wrap">
+  <div class="hero">
+    <h1>Catch the vulnerability in the pull request, fix it in one click</h1>
+    <p class="lead">SafeCode AI scans only the lines a pull request changes, filters false alarms and tells you why, and suggests a fix you can commit in one click. Explanations in Russian or English.</p>
+    <div class="cta">
+      <a class="btn primary" href="/dashboard">Open the dashboard</a>
+      <a class="btn" id="demo-pr" href="#" hidden rel="noopener">See the live demo PR</a>
+    </div>
+  </div>
+
+  <section aria-labelledby="problem">
+    <h2 id="problem">The problem for small teams</h2>
+    <div class="grid wide" style="margin-top:16px">
+      <div class="card"><h3>Audits are expensive</h3><p class="mut">A security audit costs $10-30k, out of reach for a team of 5-50 developers.</p></div>
+      <div class="card"><h3>Scanners cry wolf</h3><p class="mut">Typical tools flood a small team with false positives, so real findings get ignored.</p></div>
+      <div class="card"><h3>Not built for us</h3><p class="mut">No Russian or Kazakh explanations and no local data residency for Central Asian teams.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="loop">
+    <h2 id="loop" style="margin-bottom:16px">One loop, live</h2>
+    <ol class="steps">
+      <li>A developer opens a pull request that adds vulnerable code.</li>
+      <li>The GitHub Action scans only the changed lines.</li>
+      <li>The bot posts a summary and inline fixes with an explanation in Russian. False alarms are filtered, each with a reason.</li>
+      <li>The check is red and merge is blocked. The developer clicks "Commit suggestion".</li>
+      <li>The Action re-runs. The finding is struck through and the check turns green.</li>
+      <li>The team lead sees real numbers on the dashboard: scans, noise removed, accepted fixes, cost per scan.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="comment">
+    <div class="sec-head"><h2 id="comment">What the developer sees</h2><span class="badge b-mock">MOCKUP</span></div>
+    <div class="pr" role="img" aria-label="Example pull request comment: 5 raw findings, 2 real, 3 filtered, with a suggested SQL fix">
+      <div class="h">### 5 raw → 2 real, 3 filtered (60% noise removed)</div>
+      <div>SafeCode AI: НЕ ПРОЙДЕНО, 2 finding(s) at or above high</div>
+      <div class="d">- app/app.py:36 SQL-инъекция (critical, CWE-89)</div>
+      <div class="d">- app/app.py:8 Слабое хеширование паролей (high, CWE-327)</div>
+      <div class="d">&#9656; Отфильтровано (3): constant SQL, test-only token, md5 cache key</div>
+      <pre><span class="del">-        rows = db.execute(f"SELECT id, name FROM users WHERE name LIKE '%{q}%'").fetchall()</span>
+<span class="add">+        rows = db.execute("SELECT id, name FROM users WHERE name LIKE ?", (f"%{q}%",)).fetchall()</span></pre>
+    </div>
+    <p class="note">Static render of the comment produced for a real demo PR. The numbers on the dashboard come from live scans, not from this block.</p>
+  </section>
+
+  <section aria-labelledby="real">
+    <h2 id="real" style="margin-bottom:8px">What is real in this MVP</h2>
+    <div class="card">
+      <div class="real-row"><span class="badge b-real">REAL</span><span>GitHub Action on pull requests, Python rules (SQL injection, hardcoded secret, weak hash, insecure random, shell=True), false-positive filter with reasons, rule-based fixes as GitHub suggestions, ingest API, live dashboard. Own engine on Python AST, 5 rules.</span></div>
+      <div class="real-row"><span class="badge b-real">REAL</span><span>Optional AI verdict (OpenAI or Anthropic), off unless a key is set. The AI only judges findings; fixes are always rule-based.</span></div>
+      <div class="real-row"><span class="badge b-sim">SIMULATED</span><span>Six business KPIs for September 2027 on the dashboard. They are plan values, not measurements.</span></div>
+      <div class="real-row"><span class="badge b-mock">MOCKUP</span><span>The pull request comment above is a static render.</span></div>
+      <div class="real-row"><span class="badge b-plan">PLANNED</span><span>JavaScript rules, Kazakh, free scan page, GitHub App, GitLab, Slack and Jira, on-prem and local data residency for banks, SSO.</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="pricing">
+    <div class="sec-head"><h2 id="pricing">Pricing</h2><span class="badge b-plan">PROPOSED</span></div>
+    <div class="grid wide">
+      <div class="card price"><h3>Free</h3><div class="amt">0 KZT</div><ul><li>1 repository</li></ul></div>
+      <div class="card price"><h3>Team</h3><div class="amt num">125,000 KZT</div><span class="mut">per team per month</span></div>
+      <div class="card price"><h3>Enterprise</h3><div class="amt">Custom</div><ul><li>Private deployment (planned)</li><li>60-day free pilot for banks</li></ul></div>
+    </div>
+    <p class="note">Proposed prices. Nothing is purchasable yet.</p>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  Torgaev Nurlybek (finance lead) · Zharkem Aldiyar (technical lead) · Orazova Aruzhan (growth lead) · Ulzhebayev Aslan (AI product owner)<br>
+  MVP v2, university project.
+</div></footer>
+
+<script>
+fetch("/api/config").then((r) => r.ok ? r.json() : {}).then((c) => {
+  if (c.demo_pr_url) { const a = document.getElementById("demo-pr"); a.href = c.demo_pr_url; a.hidden = false; }
+}).catch(() => {});
+</script>
+</body>
+</html>

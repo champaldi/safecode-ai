@@ -25,6 +25,14 @@ def test_fresh_db_is_zeros_and_pages_load(client):
     assert client.get("/healthz").status_code == 200
 
 
+def test_landing_static_and_config(client, monkeypatch):
+    assert "Catch the vulnerability" in client.get("/").text
+    assert client.get("/static/app.css").status_code == 200
+    assert client.get("/api/config").json() == {"demo_pr_url": ""}
+    monkeypatch.setenv("DEMO_PR_URL", "https://github.com/x/y/pull/3")
+    assert client.get("/api/config").json()["demo_pr_url"].endswith("/pull/3")
+
+
 def test_ingest_requires_bearer_token(client, monkeypatch):
     body = {"repo": "o/r", "pr": 1, "sha": "a", "conclusion": "success", "duration_s": 1, "findings": []}
     assert client.post("/api/ingest", json=body).status_code == 401
