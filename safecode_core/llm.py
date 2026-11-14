@@ -41,8 +41,11 @@ def _call(prompt: str):
 
 def verdict(rule: str, snippet: str, hint: str) -> dict | None:
     """snippet = flagged lines +-10 only, never a whole file. Returns None on any failure (caller falls back)."""
-    prompt = (f"Security rule '{rule}' flagged this Python code. Rule-based hint: {hint or 'none'}.\n"
-              f"```python\n{snippet}\n```\nIs it a real vulnerability? "
+    prompt = (f"Security rule '{rule}' flagged this Python code. Rule-based hint (why it may be a false positive): "
+              f"{hint or 'none'}.\n```python\n{snippet}\n```\n"
+              "Judge only the flagged line. Not a vulnerability: an SQL string with no interpolated input; "
+              "md5/sha1 used for checksums or cache keys (not passwords); code in tests; a fully literal command. "
+              "Keep the hint's conclusion unless the code clearly contradicts it. Is it a real vulnerability? "
               'Reply with JSON only: {"real": true|false, "reason": "<one short sentence>"}')
     last = None
     for _ in range(2):  # 1 retry
