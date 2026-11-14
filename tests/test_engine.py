@@ -69,15 +69,32 @@ def test_llm_off_without_key_and_fallback(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert not llm.enabled()
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
-    monkeypatch.setattr(llm, "_post", lambda p: (_ for _ in ()).throw(TimeoutError()))
+    monkeypatch.setattr(llm, "_post", lambda *a: (_ for _ in ()).throw(TimeoutError()))
     assert llm.verdict("r", "x", "") is None  # timeout -> caller falls back
 
 
 def test_llm_verdict_is_final_and_counts_tokens(monkeypatch, pr):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     monkeypatch.setenv("LLM_PRICE_INPUT_PER_1K_KZT", "2")
-    monkeypatch.setattr(llm, "_post", lambda p: {"content": [{"text": '{"real": false, "reason": "ok to ignore"}'}],
+    monkeypatch.setattr(llm, "_post", lambda *a: {"content": [{"text": '{"real": false, "reason": "ok to ignore"}'}],
                                                   "usage": {"input_tokens": 1000, "output_tokens": 0}})
     fs, usage, _ = runner.scan_diff(pr.diff(), pr.root, "en")
     assert usage["ai"] and usage["tin"] == 5000 and all(f.filtered for f in fs)
     assert cost.cost_kzt(usage["tin"], 0) == 10
+
+
+def test_openai_provider_request_and_response(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    seen = {}
+
+    def fake(url, headers, payload):
+        seen.update(url=url, auth=headers["authorization"], model=payload["model"])
+        return {"choices": [{"message": {"content": '{"real": true, "reason": "user input reaches SQL"}'}}],
+                "usage": {"prompt_tokens": 300, "completion_tokens": 20}}
+
+    monkeypatch.setattr(llm, "_post", fake)
+    assert llm.provider() == "openai"
+    v = llm.verdict("sql-injection", "x", "")
+    assert v == {"real": True, "reason": "user input reaches SQL", "tin": 300, "tout": 20}
+    assert seen == {"url": llm.OPENAI_URL, "auth": "Bearer sk-test", "model": "gpt-4o-mini"}

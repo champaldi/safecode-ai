@@ -1,21 +1,42 @@
-"""Optional LLM layer: final FP verdict only. OFF unless ANTHROPIC_API_KEY is set."""
+"""Optional LLM layer: final FP verdict only. OFF unless ANTHROPIC_API_KEY or OPENAI_API_KEY is set.
+Anthropic wins if both are set. Model: LLM_MODEL (defaults below)."""
 import json
+import logging
 import os
 import urllib.request
 
-API = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+
+
+def provider() -> str:
+    return "anthropic" if os.environ.get("ANTHROPIC_API_KEY") else "openai" if os.environ.get("OPENAI_API_KEY") else ""
 
 
 def enabled() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    return bool(provider())
 
 
-def _post(payload: dict) -> dict:
-    req = urllib.request.Request(API, json.dumps(payload).encode(), {
-        "x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01",
-        "content-type": "application/json"})
+def _post(url: str, headers: dict, payload: dict) -> dict:
+    req = urllib.request.Request(url, json.dumps(payload).encode(), {"content-type": "application/json", **headers})
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.load(r)
+
+
+def _call(prompt: str):
+    """Returns (text, tokens_in, tokens_out)."""
+    model = os.environ.get("LLM_MODEL")
+    if provider() == "anthropic":
+        r = _post(ANTHROPIC_URL, {"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01"},
+                  {"model": model or "claude-haiku-5-5", "max_tokens": 150,
+                   "messages": [{"role": "user", "content": prompt}]})
+        u = r.get("usage", {})
+        return r["content"][0]["text"], u.get("input_tokens", 0), u.get("output_tokens", 0)
+    r = _post(OPENAI_URL, {"authorization": "Bearer " + os.environ["OPENAI_API_KEY"]},
+              {"model": model or "gpt-4o-mini", "max_completion_tokens": 150,
+               "response_format": {"type": "json_object"}, "messages": [{"role": "user", "content": prompt}]})
+    u = r.get("usage", {})
+    return r["choices"][0]["message"]["content"], u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
 
 
 def verdict(rule: str, snippet: str, hint: str) -> dict | None:
@@ -23,16 +44,13 @@ def verdict(rule: str, snippet: str, hint: str) -> dict | None:
     prompt = (f"Security rule '{rule}' flagged this Python code. Rule-based hint: {hint or 'none'}.\n"
               f"```python\n{snippet}\n```\nIs it a real vulnerability? "
               'Reply with JSON only: {"real": true|false, "reason": "<one short sentence>"}')
-    payload = {"model": os.environ.get("LLM_MODEL", "claude-haiku-5-5"), "max_tokens": 150,
-               "messages": [{"role": "user", "content": prompt}]}
+    last = None
     for _ in range(2):  # 1 retry
         try:
-            r = _post(payload)
-            txt = r["content"][0]["text"]
+            txt, tin, tout = _call(prompt)
             d = json.loads(txt[txt.index("{"):txt.rindex("}") + 1])
-            u = r.get("usage", {})
-            return {"real": bool(d["real"]), "reason": str(d.get("reason", "")),
-                    "tin": u.get("input_tokens", 0), "tout": u.get("output_tokens", 0)}
-        except Exception:
-            continue
+            return {"real": bool(d["real"]), "reason": str(d.get("reason", "")), "tin": tin, "tout": tout}
+        except Exception as e:
+            last = e
+    logging.getLogger("safecode").warning("LLM call failed, using rule-based result: %s", type(last).__name__)
     return None

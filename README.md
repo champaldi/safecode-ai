@@ -1,6 +1,6 @@
 # SafeCode AI (MVP v2, reduced scope)
 
-A GitHub Action that scans only the lines changed in a pull request for Python security bugs, filters out false positives with a reason, posts a summary comment plus inline `suggestion` fixes (Russian or English), sets a pass/fail check, and sends scan metadata (never source code) to a small dashboard.
+SafeCode AI uses its own engine on Python's AST with 5 rules (not Semgrep, although the original spec planned it). It is a GitHub Action that scans only the lines changed in a pull request for Python security bugs, filters out false positives with a reason, posts a summary comment plus inline `suggestion` fixes (Russian or English), sets a pass/fail check, and sends scan metadata (never source code) to a small dashboard.
 
 The summary headline looks like this, on the demo PR: **5 raw → 2 real, 3 filtered (60% noise removed)**.
 
@@ -23,7 +23,7 @@ Real GitHub setup: see [SETUP.md](SETUP.md). Defence plan with backups: [demo/DE
 | Python rules: SQL injection, hardcoded secret, weak hash, insecure random, `subprocess shell=True` | **REAL** | stdlib `ast`, no Semgrep |
 | False-positive heuristics + reasons | **REAL** | tests, constant SQL, md5/sha1 away from password names, random away from token names, literal commands |
 | Rule-based fixes, RU and EN text | **REAL** | Every fix is labelled "Rule-based fix" |
-| LLM verdict layer | **REAL but OFF by default** | Only on when `ANTHROPIC_API_KEY` is set; not run against the live API in this build, tested with a mock |
+| LLM verdict layer (Anthropic or OpenAI) | **IMPLEMENTED, OFF by default** | On when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set. Unit-tested with mocks. Say "verified live" only after real scans with a key (see the changelog line at the bottom) |
 | AI-written fixes | **PLANNED** | The LLM only gives a verdict today; fixes are always rule-based |
 | Dashboard "REAL" block (PR scans, findings, filtered %, accepted fixes, scan time, cost per scan) | **REAL** | Starts at zero, fills only from ingested scans |
 | Dashboard "SIMULATED" block (six Sept 2027 KPIs) | **SIMULATED** | Plan values; statuses computed from the threshold rules |
