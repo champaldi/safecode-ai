@@ -23,7 +23,7 @@ Real GitHub setup: see [SETUP.md](SETUP.md). Defence plan with backups: [demo/DE
 | Python rules: SQL injection, hardcoded secret, weak hash, insecure random, `subprocess shell=True` | **REAL** | stdlib `ast`, no Semgrep |
 | False-positive heuristics + reasons | **REAL** | tests, constant SQL, md5/sha1 away from password names, random away from token names, literal commands |
 | Rule-based fixes, RU and EN text | **REAL** | Every fix is labelled "Rule-based fix" |
-| LLM verdict layer (Anthropic or OpenAI) | **IMPLEMENTED, OFF by default** | On when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set. Unit-tested with mocks. Say "verified live" only after real scans with a key (see the changelog line at the bottom) |
+| LLM verdict layer (Anthropic or OpenAI) | **REAL, verified with OpenAI `gpt-4o-mini`, OFF by default** | Verified live on 6 scans of the demo PR. Anthropic path is mock-tested only. With the first prompt the model overturned the heuristics (4 real, 20% noise); after the prompt encoded the false-positive criteria it gave 2 real / 3 filtered on 3 of 3 scans. A scan takes about 6 s instead of 0.4 s (about 1,300 input and 130 output tokens). Rule-based fixes are unchanged: the AI only judges |
 | AI-written fixes | **PLANNED** | The LLM only gives a verdict today; fixes are always rule-based |
 | Dashboard "REAL" block (PR scans, findings, filtered %, accepted fixes, scan time, cost per scan) | **REAL** | Starts at zero, fills only from ingested scans |
 | Dashboard "SIMULATED" block (six Sept 2027 KPIs) | **SIMULATED** | Plan values; statuses computed from the threshold rules |
