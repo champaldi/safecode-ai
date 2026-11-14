@@ -1,0 +1,5 @@
+.pytest_tmp/
+__pycache__/
+data/
+.env
+.arena/

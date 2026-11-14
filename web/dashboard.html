@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeCode AI: Dashboard</title>
+<style>
+  :root { --bg:#0b1220; --card:#111b2e; --line:#1f2d47; --txt:#e6edf7; --mut:#8fa3c2; --teal:#2dd4bf;
+          --green:#22c55e; --yellow:#eab308; --red:#ef4444; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.5 Inter, system-ui, sans-serif; }
+  main { max-width:1040px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { margin:0 0 4px; font-size:26px; } h2 { font-size:18px; margin:0; }
+  .sub { color:var(--mut); }
+  section { margin-top:32px; }
+  .head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .badge { font:600 11px/1 ui-monospace, monospace; letter-spacing:.08em; padding:5px 8px; border-radius:4px; }
+  .real { background:rgba(45,212,191,.15); color:var(--teal); border:1px solid var(--teal); }
+  .sim { background:rgba(234,179,8,.12); color:var(--yellow); border:1px solid var(--yellow); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  .card .k { color:var(--mut); font-size:13px; } .card .v { font-size:28px; font-weight:600; margin-top:4px; }
+  .card small { color:var(--mut); display:block; margin-top:6px; }
+  .kpi { border-left:4px solid var(--line); } .kpi.green{border-left-color:var(--green)} .kpi.yellow{border-left-color:var(--yellow)} .kpi.red{border-left-color:var(--red)}
+  .st { font:600 11px ui-monospace, monospace; text-transform:uppercase; }
+  .st.green{color:var(--green)} .st.yellow{color:var(--yellow)} .st.red{color:var(--red)}
+  table { width:100%; border-collapse:collapse; margin-top:12px; font-size:14px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); } th { color:var(--mut); font-weight:500; }
+  td.mono { font-family:ui-monospace, monospace; } a { color:var(--teal); }
+  .empty { color:var(--mut); padding:16px; border:1px dashed var(--line); border-radius:8px; margin-top:12px; }
+  #upd { color:var(--mut); font-size:13px; margin-left:auto; }
+  .legend { color:var(--mut); font-size:13px; margin-top:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SafeCode AI</h1>
+  <div class="sub">Pull-request security scans, false positives filtered, one-click fixes.</div>
+
+  <section>
+    <div class="head"><h2>MVP evidence: real data</h2><span class="badge real">REAL</span>
+      <span id="upd">loading…</span></div>
+    <div class="grid" id="real"></div>
+    <div id="recent"></div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Business KPIs: September 2027</h2><span class="badge sim">SIMULATED</span></div>
+    <div class="grid" id="sim"></div>
+    <div class="legend">Higher-is-better KPIs: green &ge;95% of target, yellow 85-95%, red &lt;85%.
+      Lower-is-better: burn green &le;105% of ceiling, yellow 105-115%, red &gt;115%; churn green &le;2%, yellow 2-3%, red &gt;3%.
+      Uptime: green &ge;99.5%, yellow 99.0-99.5%, red &lt;99.0%. Values are a plan simulation, not measurements.</div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let lastOk = null;
+
+function tile(k, v, s) { return `<div class="card"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<small>${s}</small>` : ""}</div>`; }
+
+function render(d) {
+  const r = d.real;
+  $("real").innerHTML =
+    tile("PR scans", r.pr_scans, `${r.prs} PR(s)`) +
+    tile("Real findings", r.findings, "first scan of each PR") +
+    tile("Noise filtered", r.filtered_pct + "%", `${r.filtered} of ${r.raw} raw findings`) +
+    tile("Accepted fixes", r.accepted_fixes, "finding gone in a newer commit of the same PR") +
+    tile("Avg scan time", r.avg_scan_s + " s", "") +
+    tile("Cost per scan", r.avg_cost_kzt + " KZT", `${r.ai_scans} of ${r.pr_scans} scans used AI; rule-based scans cost 0`);
+  $("recent").innerHTML = r.recent.length
+    ? `<table><tr><th>PR</th><th>Commit</th><th>Raw</th><th>Real</th><th>Filtered</th><th>Check</th></tr>` +
+      r.recent.map((x) => `<tr><td><a href="${esc(x.url)}">${esc(x.repo)}#${x.pr}</a></td><td class="mono">${esc(x.sha.slice(0, 7))}</td>` +
+        `<td>${x.raw}</td><td>${x.real}</td><td>${x.filtered}</td><td>${esc(x.conclusion)}</td></tr>`).join("") + `</table>`
+    : `<div class="empty">No PR scans yet. Open a pull request in a repo that uses the SafeCode AI Action and the numbers appear here.</div>`;
+  $("sim").innerHTML = d.simulated.map((k) =>
+    `<div class="card kpi ${k.status}"><div class="k">${esc(k.id)} ${esc(k.name)}${k.lower_is_better ? " (lower is better)" : ""}</div>` +
+    `<div class="v">${k.simulated} <span class="sub" style="font-size:14px">${esc(k.unit)}</span></div>` +
+    `<small>Target ${k.target} · deviation ${k.deviation > 0 ? "+" : ""}${k.deviation} (${k.deviation_pct > 0 ? "+" : ""}${k.deviation_pct}%)${k.note ? " · " + esc(k.note) : ""}</small>` +
+    `<small><span class="st ${k.status}">${k.status}</span> · ${esc(k.action)}</small>` +
+    `<small>${esc(k.owner)} / ${esc(k.deadline)}</small></div>`).join("");
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/stats", { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    render(await res.json());
+    lastOk = Date.now();
+  } catch (e) { /* keep last data; the "updated" label shows staleness */ }
+}
+function tick() { $("upd").textContent = lastOk ? `updated ${Math.round((Date.now() - lastOk) / 1000)}s ago` : "waiting for data…"; }
+
+refresh(); setInterval(refresh, 5000); setInterval(tick, 1000);
+</script>
+</body>
+</html>
